@@ -1,10 +1,12 @@
 package ru.netology.nmedia.ui
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
+
 import android.util.AttributeSet
 import android.view.View
 import androidx.core.content.withStyledAttributes
@@ -12,6 +14,7 @@ import ru.netology.nmedia.R
 import ru.netology.nmedia.util.AndroidUtils
 import kotlin.math.min
 import kotlin.random.Random
+import android.view.animation.LinearInterpolator
 
 class StatsView @JvmOverloads constructor(
     context: Context,
@@ -26,7 +29,8 @@ class StatsView @JvmOverloads constructor(
     private var lineWidth = AndroidUtils.dp(context, 5F).toFloat()
     private var fontSize = AndroidUtils.dp(context, 40F).toFloat()
     private var colors = emptyList<Int>()
-
+    private var progress = 0f
+    private var valueAnimator: ValueAnimator? = null
     init {
         context.withStyledAttributes(attrs, R.styleable.StatsView) {
             lineWidth = getDimension(R.styleable.StatsView_lineWidth, lineWidth)
@@ -50,7 +54,23 @@ class StatsView @JvmOverloads constructor(
     }
 
 
+    private fun update() {
+        valueAnimator?.removeAllUpdateListeners()
+        valueAnimator?.cancel()
 
+        progress = 0f
+
+        valueAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            addUpdateListener { anim ->
+                progress = anim.animatedValue as Float
+                invalidate()
+            }
+            duration = 2000
+            interpolator = LinearInterpolator()
+        }.also {
+            it.start()
+        }
+    }
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -61,7 +81,7 @@ class StatsView @JvmOverloads constructor(
     var data: List<Float> = emptyList()
         set(value) {
             field = value
-            invalidate()
+            update()
         }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -85,19 +105,20 @@ class StatsView @JvmOverloads constructor(
 
         val firstColor = colors.getOrNull(0) ?: randomColor()
 
-        var startFrom = -90F
+        val rotation = 360f * progress
+        var startFrom = -90f + rotation
+
         for ((index, datum) in data.withIndex()) {
-            val angle = 360F * datum / total
+            val angle = 360f * datum / total
             paint.color = if (index == 0) firstColor else colors.getOrNull(index) ?: randomColor()
-            canvas.drawArc(oval, startFrom, angle, false, paint)
+            canvas.drawArc(oval, startFrom, angle * progress, false, paint)
             startFrom += angle
         }
 
-        dotPaint.color = firstColor
-        canvas.drawPoint(center.x, center.y - radius, dotPaint)
+
 
         canvas.drawText(
-            "%.2f%%".format(100F),
+            "%.2f%%".format(progress *100F),
             center.x,
             center.y + textPaint.textSize / 4,
             textPaint,
